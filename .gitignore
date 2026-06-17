@@ -1,0 +1,8 @@
+.env
+state.json
+telegram_offset.json
+restart_notify.json
+generated/
+uploads/
+__pycache__/
+
