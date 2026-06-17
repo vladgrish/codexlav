@@ -30,7 +30,7 @@ Exit criteria:
 ## Milestone 4: Verification
 
 Exit criteria:
-- `scripts/validate_release.sh` passes.
+- [`scripts/validate_release.sh`](scripts/validate_release.sh) passes.
 - `git status --short` contains only intentional release files.
 - no hardcoded private identifiers remain.
 - manual service install path is documented and runnable on target VM.

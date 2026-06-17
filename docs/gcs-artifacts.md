@@ -20,7 +20,7 @@ Codexlav sends small artifacts directly to Telegram. Larger files are uploaded t
 
 ## Bucket Setup
 
-`scripts/bootstrap_gcp.sh` configures:
+[`scripts/bootstrap_gcp.sh`](../scripts/bootstrap_gcp.sh) configures:
 
 - required Google APIs
 - artifact bucket creation

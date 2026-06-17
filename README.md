@@ -40,17 +40,17 @@ Fast path:
 
 1. Log in to Google Cloud Console.
 2. Create a GCP project and enable billing.
-3. Open Cloud Shell and run the VM bootstrap script.
+3. Open Cloud Shell and run [`scripts/cloud_shell_bootstrap.sh`](scripts/cloud_shell_bootstrap.sh).
 4. SSH into the VM.
 5. Install Codex CLI.
 6. Clone this repo.
-7. Click through Telegram setup: BotFather, create private group, enable topics, add bot.
-8. Use Codex-assisted setup or run `scripts/setup_vm.sh`.
+7. Click through Telegram setup using [`docs/telegram-setup.md`](docs/telegram-setup.md): BotFather, create private group, enable topics, add bot.
+8. Use Codex-assisted setup or run [`scripts/setup_vm.sh`](scripts/setup_vm.sh).
 9. Test `/status` in Telegram.
 
 ## Cloud Shell VM Bootstrap
 
-In Cloud Shell:
+In Cloud Shell, run [`scripts/cloud_shell_bootstrap.sh`](scripts/cloud_shell_bootstrap.sh):
 
 ```bash
 export GCP_PROJECT=your-gcp-project-id
@@ -60,9 +60,9 @@ export VM_NAME=codexlav-vm
 curl -fsS https://raw.githubusercontent.com/vladgrish/codexlav/main/scripts/cloud_shell_bootstrap.sh | bash
 ```
 
-Alternative: copy the contents of [`scripts/cloud_shell_bootstrap.sh`](scripts/cloud_shell_bootstrap.sh) into Cloud Shell and run it.
+Alternative: copy [`scripts/cloud_shell_bootstrap.sh`](scripts/cloud_shell_bootstrap.sh) into Cloud Shell and run it there.
 
-Then SSH:
+Then SSH into the VM:
 
 ```bash
 gcloud compute ssh codexlav-vm --zone=us-central1-a
@@ -77,7 +77,7 @@ sudo apt-get install -y git python3 gh curl
 
 Install `gcloud` if missing. Install Codex CLI so `codex` is available on `PATH`.
 
-Clone:
+Clone this repo:
 
 ```bash
 git clone https://github.com/vladgrish/codexlav.git
@@ -98,7 +98,7 @@ Minimum clicks:
 4. Create private Telegram group.
 5. Enable topics if you want per-topic Codex sessions.
 6. Add bot to group.
-7. Run setup script below.
+7. Run [`scripts/setup_vm.sh`](scripts/setup_vm.sh), or use Codex-assisted setup below.
 
 After setup, use [`docs/usage.md`](docs/usage.md) for DM, group, topic, restart, delete, image, handoff, and session commands.
 
@@ -106,7 +106,7 @@ After setup, use [`docs/usage.md`](docs/usage.md) for DM, group, topic, restart,
 
 GCP project, billing, VM creation, and basic VM access happen outside this repo. After the VM exists and Codex CLI is installed, Codex can drive the rest from the docs.
 
-From the VM:
+From the VM, run Codex in the repo:
 
 ```bash
 cd "$HOME"
@@ -141,6 +141,8 @@ Use this path if you want Codex to inspect the VM state and adapt. Use the scrip
 
 ## One-Shot VM Setup
 
+Run [`scripts/setup_vm.sh`](scripts/setup_vm.sh):
+
 ```bash
 scripts/setup_vm.sh
 ```
@@ -158,7 +160,7 @@ The script asks for:
 It writes `.env`, configures GCS artifact storage, installs the systemd user service, and starts the bot.
 It also installs or updates the caveman Codex skill from `https://github.com/JuliusBrussee/caveman`.
 
-After first start, DM the bot with `/id` if you do not know your Telegram user ID. Re-run `scripts/setup_vm.sh` with the returned ID.
+After first start, DM the bot with `/id` if you do not know your Telegram user ID. Re-run [`scripts/setup_vm.sh`](scripts/setup_vm.sh) with the returned ID.
 
 ## Configure
 
@@ -187,6 +189,8 @@ For every key and where to get it, see [`docs/config-reference.md`](docs/config-
 
 ## Validate Local Host
 
+Run [`scripts/check_local_requirements.sh`](scripts/check_local_requirements.sh):
+
 ```bash
 scripts/check_local_requirements.sh
 ```
@@ -195,7 +199,7 @@ This checks required host commands before bootstrap.
 
 ## Install Caveman Skill
 
-`scripts/setup_vm.sh` runs this automatically. Manual install:
+[`scripts/setup_vm.sh`](scripts/setup_vm.sh) runs this automatically. Manual install with [`scripts/install_caveman_skill.sh`](scripts/install_caveman_skill.sh):
 
 ```bash
 scripts/install_caveman_skill.sh
@@ -209,6 +213,8 @@ https://github.com/JuliusBrussee/caveman
 
 ## Bootstrap GCP
 
+Run [`scripts/bootstrap_gcp.sh`](scripts/bootstrap_gcp.sh):
+
 ```bash
 scripts/bootstrap_gcp.sh
 ```
@@ -220,13 +226,15 @@ This sets active `gcloud` project/region/zone, enables required APIs, creates th
 The bot reads config from process environment with `os.environ`.
 
 - systemd service uses `EnvironmentFile=/path/to/.env`
-- `scripts/run_bot.sh` uses `set -a; . .env; set +a` so Python receives exported variables
-- `scripts/bootstrap_gcp.sh` sources `.env` for shell variables like `GCP_PROJECT`
-- `scripts/setup_vm.sh` writes `.env`, then calls the other scripts
+- [`scripts/run_bot.sh`](scripts/run_bot.sh) uses `set -a; . .env; set +a` so Python receives exported variables
+- [`scripts/bootstrap_gcp.sh`](scripts/bootstrap_gcp.sh) sources `.env` for shell variables like `GCP_PROJECT`
+- [`scripts/setup_vm.sh`](scripts/setup_vm.sh) writes `.env`, then calls the other scripts
 
 You do not need to source `.env` manually for normal setup.
 
 ## Run Bot Manually
+
+Run [`scripts/run_bot.sh`](scripts/run_bot.sh):
 
 ```bash
 scripts/run_bot.sh
@@ -235,6 +243,8 @@ scripts/run_bot.sh
 In Telegram, send `/id` to the bot in DM. Put the returned numeric user ID into `.env`, restart, then test with `/status`.
 
 ## Install User Service
+
+Run [`scripts/install_systemd_user_service.sh`](scripts/install_systemd_user_service.sh):
 
 ```bash
 scripts/install_systemd_user_service.sh
@@ -256,6 +266,8 @@ journalctl --user -u telegram-codex-bot.service -f
 ## Release Check
 
 Before sharing or publishing:
+
+Run [`scripts/validate_release.sh`](scripts/validate_release.sh):
 
 ```bash
 scripts/validate_release.sh

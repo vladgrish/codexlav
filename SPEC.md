@@ -72,50 +72,52 @@ Tracked files must not contain:
 
 ## Required Files
 
-- `README.md`
-- `PLAN.md`
-- `SPEC.md`
-- `.gitignore`
-- `env.example`
-- `scripts/check_local_requirements.sh`
-- `scripts/cloud_shell_bootstrap.sh`
-- `scripts/bootstrap_gcp.sh`
-- `scripts/install_caveman_skill.sh`
-- `scripts/setup_vm.sh`
-- `scripts/run_bot.sh`
-- `scripts/install_systemd_user_service.sh`
-- `scripts/validate_release.sh`
-- `docs/gcp-console-assistant-prompt.md`
-- `docs/gcs-artifacts.md`
-- `docs/github-cli-git-access.md`
-- `docs/telegram-setup.md`
-- `bot/bot.py`
-- `bot/telegram-codex-bot.service`
+- [`README.md`](README.md)
+- [`PLAN.md`](PLAN.md)
+- [`SPEC.md`](SPEC.md)
+- [`.gitignore`](.gitignore)
+- [`env.example`](env.example)
+- [`scripts/check_local_requirements.sh`](scripts/check_local_requirements.sh)
+- [`scripts/cloud_shell_bootstrap.sh`](scripts/cloud_shell_bootstrap.sh)
+- [`scripts/bootstrap_gcp.sh`](scripts/bootstrap_gcp.sh)
+- [`scripts/install_caveman_skill.sh`](scripts/install_caveman_skill.sh)
+- [`scripts/setup_vm.sh`](scripts/setup_vm.sh)
+- [`scripts/run_bot.sh`](scripts/run_bot.sh)
+- [`scripts/install_systemd_user_service.sh`](scripts/install_systemd_user_service.sh)
+- [`scripts/validate_release.sh`](scripts/validate_release.sh)
+- [`docs/gcp-console-assistant-prompt.md`](docs/gcp-console-assistant-prompt.md)
+- [`docs/gcs-artifacts.md`](docs/gcs-artifacts.md)
+- [`docs/github-cli-git-access.md`](docs/github-cli-git-access.md)
+- [`docs/telegram-setup.md`](docs/telegram-setup.md)
+- [`docs/config-reference.md`](docs/config-reference.md)
+- [`docs/usage.md`](docs/usage.md)
+- [`bot/bot.py`](bot/bot.py)
+- [`bot/telegram-codex-bot.service`](bot/telegram-codex-bot.service)
 
 ## Functional Requirements
 
-1. Fresh clone can pass `scripts/validate_release.sh`.
-2. User can create `.env` from `env.example` and identify every required value from README/docs.
-3. `scripts/check_local_requirements.sh` fails if required commands are missing.
-4. `scripts/cloud_shell_bootstrap.sh` is runnable from GCP Cloud Shell after `GCP_PROJECT` is set and creates the VM if missing.
-5. `scripts/bootstrap_gcp.sh` is rerunnable and creates/updates artifact bucket IAM, lifecycle cleanup, and signing prerequisites.
-6. `scripts/install_caveman_skill.sh` installs or updates the caveman Codex skill from `https://github.com/JuliusBrussee/caveman`.
-7. `scripts/setup_vm.sh` prompts for minimal operator input and runs local validation, caveman skill install, GCP bootstrap, and service install.
-8. `scripts/run_bot.sh` loads `.env` and starts `bot/bot.py`.
-9. `scripts/install_systemd_user_service.sh` is rerunnable, writes a path-correct user service, reloads systemd, enables service, and starts/restarts it.
+1. Fresh clone can pass [`scripts/validate_release.sh`](scripts/validate_release.sh).
+2. User can create `.env` from [`env.example`](env.example) and identify every required value from README/docs.
+3. [`scripts/check_local_requirements.sh`](scripts/check_local_requirements.sh) fails if required commands are missing.
+4. [`scripts/cloud_shell_bootstrap.sh`](scripts/cloud_shell_bootstrap.sh) is runnable from GCP Cloud Shell after `GCP_PROJECT` is set and creates the VM if missing.
+5. [`scripts/bootstrap_gcp.sh`](scripts/bootstrap_gcp.sh) is rerunnable and creates/updates artifact bucket IAM, lifecycle cleanup, and signing prerequisites.
+6. [`scripts/install_caveman_skill.sh`](scripts/install_caveman_skill.sh) installs or updates the caveman Codex skill from `https://github.com/JuliusBrussee/caveman`.
+7. [`scripts/setup_vm.sh`](scripts/setup_vm.sh) prompts for minimal operator input and runs local validation, caveman skill install, GCP bootstrap, and service install.
+8. [`scripts/run_bot.sh`](scripts/run_bot.sh) loads `.env` and starts [`bot/bot.py`](bot/bot.py).
+9. [`scripts/install_systemd_user_service.sh`](scripts/install_systemd_user_service.sh) is rerunnable, writes a path-correct user service, reloads systemd, enables service, and starts/restarts it.
 10. README includes zero-to-run commands for Cloud Shell bootstrap, VM setup, Telegram setup, GCS artifacts, logs, and git push.
 
 ## Acceptance Criteria
 
 Release passes only when:
-- `scripts/validate_release.sh` exits `0`.
+- [`scripts/validate_release.sh`](scripts/validate_release.sh) exits `0`.
 - `bash -n scripts/*.sh` exits `0`.
 - `python3 -m py_compile bot/bot.py` exits `0`.
-- `scripts/check_local_requirements.sh` exits `0` on target VM.
-- Fresh `.env` created from `env.example` can run `scripts/bootstrap_gcp.sh` in a test GCP project.
+- [`scripts/check_local_requirements.sh`](scripts/check_local_requirements.sh) exits `0` on target VM.
+- Fresh `.env` created from [`env.example`](env.example) can run [`scripts/bootstrap_gcp.sh`](scripts/bootstrap_gcp.sh) in a test GCP project.
 - GCS bucket has lifecycle deletion configured from `GCS_ARTIFACT_RETENTION_DAYS`.
 - GCS signing docs cover `gcloud storage sign-url`, `roles/storage.objectAdmin`, and `roles/iam.serviceAccountTokenCreator`.
-- `scripts/install_systemd_user_service.sh` creates an active `telegram-codex-bot.service`.
+- [`scripts/install_systemd_user_service.sh`](scripts/install_systemd_user_service.sh) creates an active `telegram-codex-bot.service`.
 - Telegram `/status` returns from the bot after service start.
 - forbidden-data scan finds no private identifiers.
 

@@ -31,7 +31,7 @@ sudo apt-get update
 sudo apt-get install -y git python3 gh
 ```
 
-Install and authenticate `gcloud` if your image does not include it. Install Codex CLI before running `scripts/check_local_requirements.sh`.
+Install and authenticate `gcloud` if your image does not include it. Install Codex CLI before running [`scripts/check_local_requirements.sh`](../scripts/check_local_requirements.sh).
 
 Cloud Shell copy-paste bootstrap:
 
