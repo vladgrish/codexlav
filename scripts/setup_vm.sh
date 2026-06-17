@@ -52,6 +52,7 @@ CODEX_STYLE_PREFIX="Answer in caveman full by default. Preserve user's dominant 
 CODEX_MODEL=gpt-5.4-mini
 CODEX_MODEL_OPTIONS=default,gpt-5.5,gpt-5.4,gpt-5.4-mini,gpt-5.3
 CODEX_REASONING_EFFORT=low
+CAVEMAN_SKILL_REPO=https://github.com/JuliusBrussee/caveman.git
 
 OPENAI_API_KEY=
 OPENAI_IMAGE_MODEL=gpt-image-2
@@ -68,6 +69,7 @@ ENV
 
 chmod 600 "$ENV_FILE"
 "$ROOT_DIR/scripts/check_local_requirements.sh"
+"$ROOT_DIR/scripts/install_caveman_skill.sh"
 "$ROOT_DIR/scripts/bootstrap_gcp.sh"
 "$ROOT_DIR/scripts/install_systemd_user_service.sh"
 

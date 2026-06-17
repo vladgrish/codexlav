@@ -13,6 +13,7 @@ required_files=(
   scripts/check_local_requirements.sh
   scripts/cloud_shell_bootstrap.sh
   scripts/bootstrap_gcp.sh
+  scripts/install_caveman_skill.sh
   scripts/setup_vm.sh
   scripts/run_bot.sh
   scripts/install_systemd_user_service.sh
@@ -57,6 +58,7 @@ for key in \
   TELEGRAM_OWNER_USER_ID \
   TELEGRAM_ALLOWED_CHAT_IDS \
   CODEX_CWD \
+  CAVEMAN_SKILL_REPO \
   GCS_ARTIFACT_BUCKET \
   GCS_ARTIFACT_RETENTION_DAYS \
   GCS_SIGNING_SERVICE_ACCOUNT; do

@@ -16,6 +16,7 @@ Required runtime:
 - `git`
 - GitHub CLI available as `gh`
 - `python3`
+- `curl`
 - `systemd --user`
 - `gcloud`
 - Codex CLI available as `codex`
@@ -44,6 +45,7 @@ Reference VM:
 - `CODEX_MODEL`
 - `CODEX_MODEL_OPTIONS`
 - `CODEX_REASONING_EFFORT`
+- `CAVEMAN_SKILL_REPO`
 - `OPENAI_API_KEY`
 - `OPENAI_IMAGE_MODEL`
 - `OPENAI_IMAGE_SIZE`
@@ -78,6 +80,7 @@ Tracked files must not contain:
 - `scripts/check_local_requirements.sh`
 - `scripts/cloud_shell_bootstrap.sh`
 - `scripts/bootstrap_gcp.sh`
+- `scripts/install_caveman_skill.sh`
 - `scripts/setup_vm.sh`
 - `scripts/run_bot.sh`
 - `scripts/install_systemd_user_service.sh`
@@ -96,10 +99,11 @@ Tracked files must not contain:
 3. `scripts/check_local_requirements.sh` fails if required commands are missing.
 4. `scripts/cloud_shell_bootstrap.sh` is runnable from GCP Cloud Shell after `GCP_PROJECT` is set and creates the VM if missing.
 5. `scripts/bootstrap_gcp.sh` is rerunnable and creates/updates artifact bucket IAM, lifecycle cleanup, and signing prerequisites.
-6. `scripts/setup_vm.sh` prompts for minimal operator input and runs local validation, GCP bootstrap, and service install.
-7. `scripts/run_bot.sh` loads `.env` and starts `bot/bot.py`.
-8. `scripts/install_systemd_user_service.sh` is rerunnable, writes a path-correct user service, reloads systemd, enables service, and starts/restarts it.
-9. README includes zero-to-run commands for Cloud Shell bootstrap, VM setup, Telegram setup, GCS artifacts, logs, and git push.
+6. `scripts/install_caveman_skill.sh` installs or updates the caveman Codex skill from `https://github.com/JuliusBrussee/caveman`.
+7. `scripts/setup_vm.sh` prompts for minimal operator input and runs local validation, caveman skill install, GCP bootstrap, and service install.
+8. `scripts/run_bot.sh` loads `.env` and starts `bot/bot.py`.
+9. `scripts/install_systemd_user_service.sh` is rerunnable, writes a path-correct user service, reloads systemd, enables service, and starts/restarts it.
+10. README includes zero-to-run commands for Cloud Shell bootstrap, VM setup, Telegram setup, GCS artifacts, logs, and git push.
 
 ## Acceptance Criteria
 

@@ -14,6 +14,7 @@ Exit criteria:
 - GCP bootstrap sources explicit env values and can be rerun.
 - Cloud Shell bootstrap creates the VM from a project id.
 - VM setup script prompts for minimal required values and runs the setup chain.
+- Caveman skill install pulls `https://github.com/JuliusBrussee/caveman` into Codex skills.
 - service installer writes a unit using the current clone path.
 - release validation script checks shell syntax, Python syntax, executability, required files, and secret patterns.
 

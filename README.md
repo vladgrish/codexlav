@@ -11,6 +11,7 @@ Codexlav packages a Telegram bot, GCE VM setup, GCS artifact delivery, and boots
 - private group and topic workflow
 - GCS artifact delivery for large files
 - systemd user service
+- caveman Codex skill install from `https://github.com/JuliusBrussee/caveman`
 - reproducible bootstrap and release validation scripts
 
 ## Supported Environment
@@ -18,7 +19,10 @@ Codexlav packages a Telegram bot, GCE VM setup, GCS artifact delivery, and boots
 Target runtime:
 - Debian 12 Bookworm on Google Compute Engine
 - `bash`
+- `git`
+- `gh`
 - `python3`
+- `curl`
 - `systemd --user`
 - `gcloud` authenticated to your GCP project
 - Codex CLI installed and available as `codex`
@@ -112,6 +116,7 @@ The script asks for:
 - signing service account
 
 It writes `.env`, configures GCS artifact storage, installs the systemd user service, and starts the bot.
+It also installs or updates the caveman Codex skill from `https://github.com/JuliusBrussee/caveman`.
 
 After first start, DM the bot with `/id` if you do not know your Telegram user ID. Re-run `scripts/setup_vm.sh` with the returned ID.
 
@@ -132,6 +137,7 @@ Edit `.env` and set:
 - `TELEGRAM_OWNER_USER_ID`
 - `TELEGRAM_ALLOWED_CHAT_IDS`
 - `CODEX_CWD`
+- `CAVEMAN_SKILL_REPO`
 - `GCS_ARTIFACT_BUCKET`
 - `GCS_SIGNING_SERVICE_ACCOUNT`
 
@@ -145,16 +151,38 @@ scripts/check_local_requirements.sh
 
 This checks required host commands before bootstrap.
 
+## Install Caveman Skill
+
+`scripts/setup_vm.sh` runs this automatically. Manual install:
+
+```bash
+scripts/install_caveman_skill.sh
+```
+
+Default source:
+
+```text
+https://github.com/JuliusBrussee/caveman
+```
+
 ## Bootstrap GCP
 
 ```bash
-set -a
-. ./.env
-set +a
 scripts/bootstrap_gcp.sh
 ```
 
 This sets active `gcloud` project/region/zone, enables required APIs, creates the GCS artifact bucket if missing, configures lifecycle cleanup, and grants signing/upload roles. Details: [`docs/gcs-artifacts.md`](docs/gcs-artifacts.md).
+
+## Env Loading
+
+The bot reads config from process environment with `os.environ`.
+
+- systemd service uses `EnvironmentFile=/path/to/.env`
+- `scripts/run_bot.sh` uses `set -a; . .env; set +a` so Python receives exported variables
+- `scripts/bootstrap_gcp.sh` sources `.env` for shell variables like `GCP_PROJECT`
+- `scripts/setup_vm.sh` writes `.env`, then calls the other scripts
+
+You do not need to source `.env` manually for normal setup.
 
 ## Run Bot Manually
 
