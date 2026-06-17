@@ -48,7 +48,7 @@ TELEGRAM_ALLOWED_CHAT_IDS=$TELEGRAM_ALLOWED_CHAT_IDS
 
 CODEX_CWD=$CODEX_CWD
 CODEX_YOLO=1
-CODEX_STYLE_PREFIX=Answer in caveman full by default. Preserve user's dominant language. Keep replies terse, factual, and direct. For mission-critical cmd or code work, report in formatted sections with a label line like COMMAND or RESULT, then the command or output body on the next lines.
+CODEX_STYLE_PREFIX="Answer in caveman full by default. Preserve user's dominant language. Keep replies terse, factual, and direct. For mission-critical cmd or code work, report in formatted sections with a label line like COMMAND or RESULT, then the command or output body on the next lines."
 CODEX_MODEL=gpt-5.4-mini
 CODEX_MODEL_OPTIONS=default,gpt-5.5,gpt-5.4,gpt-5.4-mini,gpt-5.3
 CODEX_REASONING_EFFORT=low
