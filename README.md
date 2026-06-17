@@ -42,10 +42,11 @@ Fast path:
 2. Create a GCP project and enable billing.
 3. Open Cloud Shell and run the VM bootstrap script.
 4. SSH into the VM.
-5. Clone this repo.
-6. Click through Telegram setup: BotFather, create private group, enable topics, add bot.
-7. Run `scripts/setup_vm.sh`.
-8. Test `/status` in Telegram.
+5. Install Codex CLI.
+6. Clone this repo.
+7. Click through Telegram setup: BotFather, create private group, enable topics, add bot.
+8. Use Codex-assisted setup or run `scripts/setup_vm.sh`.
+9. Test `/status` in Telegram.
 
 ## Cloud Shell VM Bootstrap
 
@@ -100,6 +101,43 @@ Minimum clicks:
 7. Run setup script below.
 
 After setup, use [`docs/usage.md`](docs/usage.md) for DM, group, topic, restart, delete, image, handoff, and session commands.
+
+## Codex-Assisted Setup
+
+GCP project, billing, VM creation, and basic VM access happen outside this repo. After the VM exists and Codex CLI is installed, Codex can drive the rest from the docs.
+
+From the VM:
+
+```bash
+cd "$HOME"
+git clone https://github.com/vladgrish/codexlav.git
+cd codexlav
+codex --yolo
+```
+
+Prompt:
+
+```text
+Set up Codexlav on this VM using the repo docs.
+
+Read:
+- README.md
+- docs/config-reference.md
+- docs/telegram-setup.md
+- docs/gcs-artifacts.md
+- docs/usage.md
+
+Goal:
+- create .env from env.example
+- ask me only for missing values
+- install caveman skill
+- bootstrap GCP/GCS
+- install and start user systemd service
+- verify service status and Telegram /status path
+- do not commit secrets
+```
+
+Use this path if you want Codex to inspect the VM state and adapt. Use the script path below if you want a direct shell setup.
 
 ## One-Shot VM Setup
 
