@@ -71,7 +71,7 @@ Install VM packages:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y git python3 gh
+sudo apt-get install -y git python3 gh curl
 ```
 
 Install `gcloud` if missing. Install Codex CLI so `codex` is available on `PATH`.
@@ -98,6 +98,8 @@ Minimum clicks:
 5. Enable topics if you want per-topic Codex sessions.
 6. Add bot to group.
 7. Run setup script below.
+
+After setup, use [`docs/usage.md`](docs/usage.md) for DM, group, topic, restart, delete, image, handoff, and session commands.
 
 ## One-Shot VM Setup
 
@@ -142,6 +144,8 @@ Edit `.env` and set:
 - `GCS_SIGNING_SERVICE_ACCOUNT`
 
 Keep `.env` untracked. `.gitignore` already excludes it.
+
+For every key and where to get it, see [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Validate Local Host
 

@@ -19,9 +19,11 @@ required_files=(
   scripts/install_systemd_user_service.sh
   scripts/validate_release.sh
   docs/gcp-console-assistant-prompt.md
+  docs/config-reference.md
   docs/gcs-artifacts.md
   docs/github-cli-git-access.md
   docs/telegram-setup.md
+  docs/usage.md
   bot/bot.py
   bot/telegram-codex-bot.service
 )

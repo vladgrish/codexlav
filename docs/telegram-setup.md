@@ -1,14 +1,72 @@
 # Telegram Setup
 
-1. Create a bot with BotFather.
-2. Put the token into `.env`.
-3. Start the bot once in a private DM and run `/id`.
-4. Put that numeric user id into `TELEGRAM_ALLOWED_USER_IDS` and `TELEGRAM_OWNER_USER_ID`.
-5. Create a private supergroup and enable topics if you want per-topic Codex sessions.
-6. Add the bot to the group.
-7. Send `/id` in the group, or inspect bot logs, to get the negative group chat id.
-8. Put the group chat id into `TELEGRAM_ALLOWED_CHAT_IDS`.
-9. Keep the group private and keep allowlists enabled.
-10. Test `/status` after service start.
+## BotFather
 
-Do not commit real tokens or ids.
+1. Open Telegram.
+2. Message `@BotFather`.
+3. Run `/newbot`.
+4. Choose display name and username.
+5. Copy token into `TELEGRAM_BOT_TOKEN`.
+
+## User ID
+
+1. Start bot in private DM.
+2. Send:
+
+```text
+/id
+```
+
+3. Copy numeric ID into:
+
+```env
+TELEGRAM_ALLOWED_USER_IDS=<your-id>
+TELEGRAM_OWNER_USER_ID=<your-id>
+```
+
+`/id` works even before allowlist is configured.
+
+## Group
+
+1. Create private Telegram group.
+2. Convert to supergroup if Telegram asks.
+3. Enable topics if you want separate Codex sessions per topic.
+4. Add bot to group.
+5. Make bot admin if you want `/agent` topic creation and `/delete` topic deletion.
+6. Get group chat ID:
+
+```text
+/id
+```
+
+If that does not show group ID, inspect logs:
+
+```bash
+journalctl --user -u telegram-codex-bot.service -f
+```
+
+Look for `chat_id=...`. Group IDs are negative, often starting with `-100`.
+
+7. Set:
+
+```env
+TELEGRAM_ALLOWED_CHAT_IDS=<negative-group-id>
+```
+
+## Test
+
+In DM:
+
+```text
+/status
+```
+
+In group general chat:
+
+```text
+/agent test
+```
+
+Open the created topic and send a normal prompt.
+
+Do not commit real tokens or IDs.
