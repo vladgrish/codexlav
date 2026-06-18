@@ -76,6 +76,7 @@ CODEX_TIMEOUT_SECONDS = int(os.environ.get("CODEX_TIMEOUT_SECONDS", "900"))
 CODEX_PROGRESS_SECONDS = int(os.environ.get("CODEX_PROGRESS_SECONDS", "30"))
 TELEGRAM_PROGRESS_UPDATE_SECONDS = int(os.environ.get("TELEGRAM_PROGRESS_UPDATE_SECONDS", "5"))
 POLL_TIMEOUT_SECONDS = int(os.environ.get("TELEGRAM_POLL_TIMEOUT_SECONDS", "50"))
+MEDIA_GROUP_DELAY_SECONDS = float(os.environ.get("TELEGRAM_MEDIA_GROUP_DELAY_SECONDS", "1.0"))
 INLINE_FILE_MAX_BYTES = int(os.environ.get("TELEGRAM_INLINE_FILE_MAX_BYTES", "200000"))
 ARTIFACT_TELEGRAM_MAX_BYTES = int(os.environ.get("TELEGRAM_ARTIFACT_MAX_BYTES", "10000000"))
 GCS_ARTIFACT_BUCKET = os.environ.get("GCS_ARTIFACT_BUCKET", "").strip()
@@ -86,10 +87,22 @@ CODEX_STYLE_PREFIX = os.environ.get(
     "CODEX_STYLE_PREFIX",
     "Answer in caveman full by default. Preserve user's dominant language. Keep replies terse, factual, and direct. For mission-critical cmd or code work, report in formatted sections with a label line like COMMAND or RESULT, then the command or output body on the next lines.",
 ).strip()
+CODEX_UPLOAD_CONTRACT = (
+    "When user asks to send, upload, attach, share, or provide a local file, decide the right delivery. "
+    "If a Telegram or GCS upload is needed, emit a control block at the end exactly like:\n"
+    "UPLOAD\n"
+    "path: /absolute/local/file\n"
+    "target: telegram|gcs|auto\n"
+    "mode: photo|document|auto\n"
+    "Use target telegram for chat upload, gcs for downloadable link, auto if unsure. "
+    "Use mode document when user says attachment/document/file; photo for image preview. "
+    "Only request upload for existing local files under the workspace, home, or /tmp. Repeat UPLOAD blocks for multiple files."
+)
 HANDOFF_DIR = Path(os.environ.get("TELEGRAM_HANDOFF_DIR", "/tmp/handoff"))
 
 API_BASE = f"https://api.telegram.org/bot{TOKEN}"
 work_queue: "queue.Queue[dict]" = queue.Queue()
+REPO_ROOT = Path(__file__).resolve().parents[1]
 BASE_DIR = Path(os.environ.get("TELEGRAM_BOT_BASE_DIR", str(Path.home() / ".local/share/telegram-codex-bot")))
 IMAGE_DIR = Path(os.environ.get("TELEGRAM_IMAGE_DIR", str(BASE_DIR / "generated")))
 UPLOAD_DIR = Path(os.environ.get("TELEGRAM_UPLOAD_DIR", str(BASE_DIR / "uploads")))
@@ -102,6 +115,8 @@ RESTART_NOTIFY_MAX_AGE_SECONDS = int(os.environ.get("TELEGRAM_RESTART_NOTIFY_MAX
 state_lock = threading.Lock()
 state = {"model": CODEX_MODEL_DEFAULT, "reasoning": CODEX_REASONING_DEFAULT}
 topic_state: dict[str, dict[str, str]] = {}
+media_group_lock = threading.Lock()
+media_group_buffers: dict[str, dict] = {}
 
 
 def log(message: str) -> None:
@@ -1340,8 +1355,11 @@ def codex_command(
     resume: bool = True,
     selected_model: str | None = None,
     selected_reasoning: str | None = None,
+    enabled_features: list[str] | None = None,
 ) -> list[str]:
     cmd = ["codex", "exec"]
+    for feature in enabled_features or []:
+        cmd.extend(["--enable", feature])
     if json_output:
         cmd.append("--json")
     if resume:
@@ -1372,6 +1390,7 @@ def run_codex(
     resume: bool = True,
     selected_model: str | None = None,
     selected_reasoning: str | None = None,
+    enabled_features: list[str] | None = None,
 ) -> str:
     prompt = apply_codex_style(prompt)
     cmd = codex_command(
@@ -1380,6 +1399,7 @@ def run_codex(
         resume=resume,
         selected_model=selected_model,
         selected_reasoning=selected_reasoning,
+        enabled_features=enabled_features,
     )
     log(f"codex start images={len(image_paths or [])} prompt_chars={len(prompt)}")
     proc = subprocess.run(
@@ -1669,21 +1689,25 @@ def newest_session_file_after(started_at: float) -> Path | None:
     return candidates[0]
 
 
+def generated_after(path: Path, started_at: float) -> bool:
+    try:
+        return path.stat().st_mtime >= started_at - 1
+    except OSError:
+        return False
+
+
 def newest_generated_image_after(started_at: float) -> Path | None:
     for path in generated_image_files(25):
-        try:
-            if path.stat().st_mtime >= started_at - 1:
-                return path
-        except OSError:
-            continue
+        if generated_after(path, started_at):
+            return path
     return None
 
 
-def extract_generated_image_path(output: str) -> Path | None:
+def extract_generated_image_path(output: str, started_at: float | None = None) -> Path | None:
     pattern = re.compile(r"(/[^\s]+?\.codex/generated_images/[^\s]+?\.png)")
     for match in pattern.finditer(output):
         path = Path(match.group(1))
-        if path.exists():
+        if path.exists() and (started_at is None or generated_after(path, started_at)):
             return path
     return None
 
@@ -1709,6 +1733,98 @@ def extract_artifact_path(output: str) -> Path | None:
         return None
     candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
     return candidates[0]
+
+
+def allowed_local_file(path: Path) -> Path | None:
+    if not path.is_absolute() or not path.exists() or not path.is_file():
+        return None
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return None
+    allowed_roots = [Path(CODEX_CWD).expanduser().resolve(), Path.home().resolve(), Path("/tmp")]
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        return None
+    return resolved
+
+
+def parse_upload_blocks(text: str) -> tuple[str, list[dict]]:
+    lines = text.splitlines()
+    cleaned: list[str] = []
+    uploads: list[dict] = []
+    index = 0
+    headers = SECTION_HEADERS | {"UPLOAD"}
+
+    while index < len(lines):
+        if lines[index].strip().upper() != "UPLOAD":
+            cleaned.append(lines[index])
+            index += 1
+            continue
+
+        index += 1
+        fields: dict[str, str] = {"target": "auto", "mode": "auto"}
+        path_text = ""
+        while index < len(lines):
+            stripped = lines[index].strip()
+            upper = stripped.upper()
+            if upper in headers:
+                break
+            if not stripped:
+                index += 1
+                break
+            key, sep, value = stripped.partition(":")
+            if sep and key.strip().lower() in {"path", "target", "mode"}:
+                fields[key.strip().lower()] = value.strip()
+            elif not path_text:
+                path_text = stripped.strip("`")
+            index += 1
+
+        raw_path = fields.get("path") or path_text
+        file_path = allowed_local_file(Path(raw_path.strip("`"))) if raw_path else None
+        if file_path is not None:
+            fields["path"] = str(file_path)
+            fields["target"] = fields.get("target", "auto").lower()
+            fields["mode"] = fields.get("mode", "auto").lower()
+            uploads.append(fields)
+
+    return "\n".join(cleaned).strip(), uploads
+
+
+def execute_upload_request(chat_id: int, thread_id: int | None, request: dict) -> None:
+    file_path = allowed_local_file(Path(str(request.get("path") or "")))
+    if file_path is None:
+        return
+    target = str(request.get("target") or "auto").lower()
+    mode = str(request.get("mode") or "auto").lower()
+
+    if target == "gcs":
+        url = upload_gcs_artifact(file_path)
+        send_message(chat_id, f"Artifact download: {url}", thread_id=thread_id)
+        return
+
+    if target == "telegram":
+        if mode == "photo":
+            send_photo(chat_id, file_path, f"Uploaded: {file_path.name}", thread_id)
+        else:
+            send_document(chat_id, file_path, f"Uploaded: {file_path.name}", thread_id)
+        return
+
+    if file_path.stat().st_size > ARTIFACT_TELEGRAM_MAX_BYTES:
+        url = upload_gcs_artifact(file_path)
+        send_message(chat_id, f"Artifact download: {url}", thread_id=thread_id)
+        return
+    if mode == "document":
+        send_document(chat_id, file_path, f"Uploaded: {file_path.name}", thread_id)
+        return
+    if file_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+        send_photo(chat_id, file_path, f"Uploaded: {file_path.name}", thread_id)
+        return
+    send_document(chat_id, file_path, f"Uploaded: {file_path.name}", thread_id)
+
+
+def execute_upload_requests(chat_id: int, thread_id: int | None, requests: list[dict]) -> None:
+    for request in requests:
+        execute_upload_request(chat_id, thread_id, request)
 
 
 def send_artifact(chat_id: int, file_path: Path, thread_id: int | None = None) -> None:
@@ -1738,31 +1854,33 @@ def generate_builtin_codex_image(
     prompt: str,
     chat_id: int | None = None,
     thread_id: int | None = None,
+    image_paths: list[Path] | None = None,
     selected_model: str | None = None,
     selected_reasoning: str | None = None,
 ) -> Path:
     started_at = time.time()
     clean_prompt = clean_image_prompt(prompt)
+    if image_paths and clean_prompt == "abstract Codex avatar":
+        clean_prompt = "Generate a new image based on the attached image."
     image_prompt = (
         "$imagegen "
         f"{clean_prompt}\n\n"
         "Generate a raster image with Codex built-in image generation. "
+        "If image inputs are attached, use them as edit targets or visual references according to the prompt. "
         "After the image is generated, report the saved PNG file path only."
     )
     image_prompt = style_prompt(image_prompt)
-    if chat_id is None:
-        output = run_codex(image_prompt, selected_model=selected_model, selected_reasoning=selected_reasoning)
-    else:
-        output = run_codex_streaming(
-            image_prompt,
-            chat_id,
-            thread_id,
-            selected_model=selected_model,
-            selected_reasoning=selected_reasoning,
-        )
+    output = run_codex(
+        image_prompt,
+        image_paths=image_paths,
+        resume=False,
+        selected_model=selected_model,
+        selected_reasoning=selected_reasoning,
+        enabled_features=["imagegenext"],
+    )
     if output.startswith("Codex exited with status"):
         raise RuntimeError(output)
-    image_path = extract_generated_image_path(output) or newest_generated_image_after(started_at)
+    image_path = newest_generated_image_after(started_at) or extract_generated_image_path(output, started_at)
     if image_path is None:
         raise RuntimeError(f"Codex completed, but no generated PNG was found.\n\n{output}")
     return image_path
@@ -1794,11 +1912,15 @@ def clean_image_prompt(text: str) -> str:
 
 def apply_codex_style(prompt: str) -> str:
     prompt = prompt.strip()
-    if not CODEX_STYLE_PREFIX:
+    style_parts = [part for part in (CODEX_STYLE_PREFIX, CODEX_UPLOAD_CONTRACT) if part]
+    if not style_parts:
         return prompt
-    if prompt.startswith(CODEX_STYLE_PREFIX):
+    style = "\n".join(style_parts)
+    if prompt.startswith(style):
         return prompt
-    return f"{CODEX_STYLE_PREFIX}\n\n{prompt}"
+    if CODEX_STYLE_PREFIX and prompt.startswith(CODEX_STYLE_PREFIX):
+        return prompt.replace(CODEX_STYLE_PREFIX, style, 1)
+    return f"{style}\n\n{prompt}"
 
 
 def style_prompt(prompt: str) -> str:
@@ -1915,10 +2037,7 @@ def generate_self_image(prompt: str = "") -> Path:
 
 
 def wants_self_image(text: str) -> bool:
-    lowered = text.lower()
-    if lowered.startswith("/image"):
-        return True
-    return "image" in lowered and any(word in lowered for word in ("send", "generated", "yourself", "your self"))
+    return command_name(normalized_command(text)) == "/image"
 
 
 def wants_topic_creation(text: str) -> bool:
@@ -1938,9 +2057,12 @@ def wants_topic_creation(text: str) -> bool:
 def bot_task_prompt(task: str) -> str:
     return (
         "This is an owner-only bot/ecosystem update task for this Telegram Codex bot.\n"
-        "Primary repo: Telegram Codex bot template\n"
+        f"Primary repo: {REPO_ROOT}\n"
         "Relevant ecosystem paths may include ~/.codex/skills and Codex config.\n"
-        "Read existing code first. Keep edits scoped. Verify with relevant checks. Commit finished changes if appropriate.\n"
+        "Before editing, confirm this checkout is the codexlav repo and create a feature branch from main for the task.\n"
+        "Read existing code first. Keep edits scoped. Verify with relevant checks.\n"
+        "Before finishing, run scripts/validate_release.sh from the repo root. If it passes, commit on the feature branch, merge back to main, and leave main checked out.\n"
+        "Never commit .env, runtime state, uploads, generated files, tokens, chat IDs, user IDs, local absolute home paths, or other private machine data.\n"
         "Do not restart the bot service yourself. If restart is needed, say so in final output; the bot will show a restart button after your output.\n\n"
         f"Owner task:\n{task.strip()}"
     )
@@ -1999,6 +2121,121 @@ def topic_display_name(message: dict, chat_id: int, thread_id: int | None) -> st
     return None
 
 
+def message_text(message: dict) -> str:
+    return (message.get("text") or message.get("caption") or "").strip()
+
+
+def message_sender_label(message: dict) -> str:
+    user = message.get("from") or {}
+    if user.get("username"):
+        return "@" + str(user["username"])
+    parts = [str(user.get("first_name") or "").strip(), str(user.get("last_name") or "").strip()]
+    return " ".join(part for part in parts if part) or str(user.get("id") or "unknown")
+
+
+def extract_single_message_files(message: dict) -> tuple[list[Path], list[str]]:
+    photos = message.get("photo") or []
+    if photos:
+        largest = max(photos, key=lambda item: item.get("file_size", 0))
+        return [download_telegram_file(largest["file_id"])], []
+
+    document = message.get("document") or {}
+    mime_type = document.get("mime_type") or ""
+    file_id = document.get("file_id")
+    if mime_type.startswith("image/") and file_id:
+        return [download_telegram_file(file_id)], []
+    if file_id:
+        file_path = download_telegram_file(file_id)
+        return [], [format_uploaded_file_context(file_path)]
+
+    return [], []
+
+
+def extract_message_files(message: dict) -> tuple[list[Path], str | None]:
+    messages = message.get("_media_group_messages") or [message]
+    image_paths: list[Path] = []
+    file_contexts: list[str] = []
+    for item in messages:
+        item_images, item_contexts = extract_single_message_files(item)
+        image_paths.extend(item_images)
+        file_contexts.extend(item_contexts)
+    return image_paths, "\n\n".join(file_contexts).strip() or None
+
+
+def reply_reference(message: dict) -> tuple[str | None, list[Path], str | None]:
+    reply = message.get("reply_to_message") or {}
+    if not reply:
+        return None, [], None
+
+    parts = [f"Replied-to message from {message_sender_label(reply)}:"]
+    text = message_text(reply)
+    if text:
+        parts.append(f"```text\n{text}\n```")
+
+    image_paths, file_context = extract_message_files(reply)
+    if image_paths:
+        listed = "\n".join(f"- {path}" for path in image_paths)
+        parts.append(f"Replied-to image paths:\n{listed}")
+    if file_context:
+        parts.append(file_context)
+
+    if len(parts) == 1:
+        parts.append("(no text content)")
+    return "\n".join(parts), image_paths, file_context
+
+
+def prompt_with_reply_context(text: str, reply_context: str | None) -> str:
+    if not reply_context:
+        return text
+    if text.startswith("/"):
+        return f"{text}\n\n{reply_context}"
+    return f"{reply_context}\n\nUser message:\n{text}"
+
+
+def media_group_key(message: dict) -> str:
+    chat = message.get("chat") or {}
+    return f"{chat.get('id')}:{message.get('media_group_id')}"
+
+
+def merge_media_group_messages(messages: list[dict]) -> dict:
+    messages = sorted(messages, key=lambda item: int(item.get("message_id") or 0))
+    merged = dict(messages[0])
+    text = next((message_text(item) for item in messages if message_text(item)), "")
+    if text:
+        merged["caption"] = text
+        merged.pop("text", None)
+    merged["_media_group_messages"] = messages
+    return merged
+
+
+def flush_media_group(key: str) -> None:
+    with media_group_lock:
+        entry = media_group_buffers.pop(key, None)
+    if not entry:
+        return
+    messages = entry.get("messages") or []
+    if not messages:
+        return
+    handle_message(merge_media_group_messages(messages))
+
+
+def handle_media_group_message(message: dict) -> None:
+    key = media_group_key(message)
+    with media_group_lock:
+        entry = media_group_buffers.get(key)
+        if entry is None:
+            entry = {"messages": [], "timer": None}
+            media_group_buffers[key] = entry
+        timer = entry.get("timer")
+        if timer is not None:
+            timer.cancel()
+        entry["messages"].append(message)
+        timer = threading.Timer(MEDIA_GROUP_DELAY_SECONDS, flush_media_group, args=(key,))
+        timer.daemon = True
+        entry["timer"] = timer
+        timer.start()
+
+
 def handle_message(message: dict) -> None:
     chat = message.get("chat") or {}
     user = message.get("from") or {}
@@ -2017,7 +2254,7 @@ def handle_message(message: dict) -> None:
             log(f"topic session archive failed chat_id={chat_id} thread_id={thread_id} error={exc}")
         log(f"topic deleted chat_id={chat_id} thread_id={thread_id}; state cleared")
         return
-    text = (message.get("text") or message.get("caption") or "").strip()
+    text = message_text(message)
     if chat_id is None or user_id is None:
         return
     log(
@@ -2240,11 +2477,31 @@ def handle_message(message: dict) -> None:
             send_message(chat_id, "Use a topic for Codex work. Ask me here to create one.", thread_id=None)
         return
 
-    image_paths, file_context = extract_image_paths(message)
+    image_paths, file_context = extract_message_files(message)
+    reply_context, reply_image_paths, _reply_file_context = reply_reference(message)
+    if reply_image_paths:
+        image_paths.extend(reply_image_paths)
+    context_parts = [part for part in (file_context, reply_context) if part]
+    combined_context = "\n\n".join(context_parts).strip()
+    if wants_self_image(text):
+        prompt_text = prompt_with_reply_context(text, reply_context)
+        work_queue.put(
+            {
+                "kind": "imagegen",
+                "chat_id": chat_id,
+                "thread_id": thread_id,
+                "text": prompt_text,
+                "caption": clean_image_prompt(text),
+                "image_paths": image_paths,
+            }
+        )
+        depth = current_queue_depth()
+        log(f"queued imagegen chat_id={chat_id} depth={depth} images={len(image_paths)}")
+        return
+
     if image_paths:
         prompt = text or "Analyze this image. Describe what is visible and call out any important details."
-        if file_context:
-            prompt = f"{file_context}\n\n{prompt}"
+        prompt = prompt_with_reply_context(prompt, combined_context)
         item = {"chat_id": chat_id, "thread_id": thread_id, "text": style_prompt(prompt), "image_paths": image_paths}
         if text.startswith("/"):
             work_queue.put(item)
@@ -2256,7 +2513,7 @@ def handle_message(message: dict) -> None:
 
     if file_context:
         prompt = text or "Inspect the attached file and summarize the useful parts."
-        prompt = f"{file_context}\n\n{prompt}"
+        prompt = prompt_with_reply_context(prompt, combined_context)
         item = {"chat_id": chat_id, "thread_id": thread_id, "text": style_prompt(prompt), "image_paths": []}
         if text.startswith("/"):
             work_queue.put(item)
@@ -2266,52 +2523,23 @@ def handle_message(message: dict) -> None:
         log(f"queued file-analysis chat_id={chat_id} depth={depth}")
         return
 
-    if not text:
+    if not text and not reply_context:
         send_message(chat_id, "Send text, an image, or a file.", thread_id)
         return
 
-    if wants_self_image(text):
-        if not OPENAI_API_KEY:
-            work_queue.put({"kind": "imagegen", "chat_id": chat_id, "thread_id": thread_id, "text": text, "image_paths": []})
-            depth = current_queue_depth()
-            log(f"queued imagegen chat_id={chat_id} depth={depth}")
-            return
-        try:
-            image_path = generate_ai_image(text)
-        except Exception as exc:
-            send_message(chat_id, f"Image generation failed: {exc}", thread_id)
-            return
-        send_photo(chat_id, image_path, f"Generated with {OPENAI_IMAGE_MODEL}: {clean_image_prompt(text)}", thread_id)
-        return
-
+    if reply_context and not text:
+        text = "Use the replied-to message as context."
     topic_mode = get_topic_mode(chat_id, thread_id)
     if topic_mode == "plan":
         text = f"Create a concise execution plan for this thread. Do not execute it yet.\n\nUser request:\n{text}"
-    item = {"chat_id": chat_id, "thread_id": thread_id, "text": style_prompt(text), "image_paths": []}
+    prompt = prompt_with_reply_context(text, reply_context)
+    item = {"chat_id": chat_id, "thread_id": thread_id, "text": style_prompt(prompt), "image_paths": []}
     if text.startswith("/"):
         work_queue.put(item)
     else:
         enqueue_work(item)
     depth = current_queue_depth()
     log(f"queued codex chat_id={chat_id} depth={depth} prompt_chars={len(text)}")
-
-
-def extract_image_paths(message: dict) -> tuple[list[Path], str | None]:
-    photos = message.get("photo") or []
-    if photos:
-        largest = max(photos, key=lambda item: item.get("file_size", 0))
-        return [download_telegram_file(largest["file_id"])], None
-
-    document = message.get("document") or {}
-    mime_type = document.get("mime_type") or ""
-    file_id = document.get("file_id")
-    if mime_type.startswith("image/") and file_id:
-        return [download_telegram_file(file_id)], None
-    if file_id:
-        file_path = download_telegram_file(file_id)
-        return [], format_uploaded_file_context(file_path)
-
-    return [], None
 
 
 def handle_callback_query(callback_query: dict) -> None:
@@ -2458,10 +2686,12 @@ def worker() -> None:
                     prompt,
                     chat_id,
                     thread_id,
+                    image_paths=image_paths,
                     selected_model=selected_model,
                     selected_reasoning=selected_reasoning,
                 )
-                send_photo(chat_id, image_path, f"Generated with Codex image_gen: {clean_image_prompt(prompt)}", thread_id)
+                caption = item.get("caption") or clean_image_prompt(prompt)
+                send_photo(chat_id, image_path, f"Generated with Codex image_gen: {caption}", thread_id)
             elif item.get("kind") in {"recap", "handoff"}:
                 kind = item["kind"]
                 log(f"worker start {kind} chat_id={chat_id}")
@@ -2536,8 +2766,13 @@ def worker() -> None:
                     )
                     if session_id:
                         set_topic_session(chat_id, thread_id, session_id)
-                finish_text_response(chat_id, thread_id, status_message_id, output)
-                artifact_path = extract_artifact_path(output)
+                clean_output, upload_requests = parse_upload_blocks(output)
+                if clean_output:
+                    finish_text_response(chat_id, thread_id, status_message_id, clean_output)
+                else:
+                    delete_message(chat_id, status_message_id)
+                execute_upload_requests(chat_id, thread_id, upload_requests)
+                artifact_path = extract_artifact_path(clean_output)
                 if artifact_path:
                     send_artifact(chat_id, artifact_path, thread_id)
                 if item.get("kind") == "bot_update":
@@ -2587,7 +2822,10 @@ def main() -> None:
                     handle_callback_query(callback_query)
                 message = update.get("message") or update.get("edited_message")
                 if message:
-                    handle_message(message)
+                    if message.get("media_group_id"):
+                        handle_media_group_message(message)
+                    else:
+                        handle_message(message)
         except Exception as exc:
             print(f"poll error: {exc}", file=sys.stderr, flush=True)
             time.sleep(5)

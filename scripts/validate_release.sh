@@ -124,7 +124,7 @@ for pattern in \
   'codex-[0-9]{6,}' \
   '019e[a-f0-9-]{20,}' \
   '[-]100[0-9]{8,}'; do
-  if grep -RE --exclude-dir=.git -n -- "$pattern" .; then
+  if git grep -nE -- "$pattern"; then
     echo "forbidden private data pattern matched regex: $pattern" >&2
     exit 1
   fi

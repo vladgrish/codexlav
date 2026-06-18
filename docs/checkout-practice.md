@@ -34,6 +34,14 @@ Use placeholder values in tracked files. Real tokens, chat IDs, user IDs, servic
 
 ## Before Commit
 
+Create a feature branch from current `main` before editing:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c feature/<short-task-name>
+```
+
 Run:
 
 ```bash
@@ -63,6 +71,16 @@ For any new environment key, VM path, systemd setting, GCS behavior, Telegram co
 
 ## Sync Rule
 
-Commit public-safe source changes directly in `~/codexlav` and push `origin/main`.
+Commit public-safe source changes on the feature branch. After `scripts/validate_release.sh` passes, merge back to `main`:
+
+```bash
+git add <public-safe-files>
+git commit -m "<type>: <summary>"
+git switch main
+git merge --ff-only feature/<short-task-name> || git merge --no-ff feature/<short-task-name>
+git status --short --branch
+```
+
+Push `main` only after validation and merge.
 
 If an emergency fix happens elsewhere, port only source changes into `~/codexlav`, run validation, then retire the other copy. Do not let live code and GitHub code diverge.

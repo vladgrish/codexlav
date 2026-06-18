@@ -253,6 +253,7 @@ Usually leave these unset:
 - `TELEGRAM_HANDOFF_DIR`
 - `TELEGRAM_POLL_TIMEOUT_SECONDS`
 - `TELEGRAM_PROGRESS_UPDATE_SECONDS`
+- `TELEGRAM_MEDIA_GROUP_DELAY_SECONDS`
 - `TELEGRAM_RESTART_NOTIFY_MAX_AGE_SECONDS`
 - `TELEGRAM_ARTIFACT_MAX_BYTES`
 - `TELEGRAM_BOT_BASE_DIR`
@@ -264,6 +265,10 @@ Usually leave these unset:
 `TELEGRAM_RESTART_NOTIFY_MAX_AGE_SECONDS`
 
 Maximum age, in seconds, for restart-ready notifications.
+
+`TELEGRAM_MEDIA_GROUP_DELAY_SECONDS`
+
+Seconds to wait for Telegram media-group album messages before merging them into one Codex request.
 
 `TELEGRAM_ARTIFACT_MAX_BYTES`
 

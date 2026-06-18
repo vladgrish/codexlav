@@ -126,6 +126,14 @@ Shows recent generated images.
 
 Owner-only. Runs a Codex task against the bot/local ecosystem. Use for maintenance work.
 
+Bot maintenance tasks must work in the `codexlav` checkout on a feature branch. Before finishing, Codex should run:
+
+```bash
+scripts/validate_release.sh
+```
+
+If validation passes, Codex should commit on the feature branch, merge back to `main`, and leave `main` checked out. It must not commit `.env`, runtime state, uploads, generated files, tokens, chat IDs, user IDs, local absolute home paths, or other private machine data.
+
 ## Files And Images
 
 Send photo with caption:
@@ -175,4 +183,3 @@ systemctl --user status telegram-codex-bot.service --no-pager -l
 5. Use `/recap` before switching context.
 6. Use `/handoff` when work should continue later.
 7. Use `/delete` when topic is done.
-
