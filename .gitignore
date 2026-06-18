@@ -1,8 +1,12 @@
 .env
+.env.*
+!.env.example
 state.json
+topic_state.json
 telegram_offset.json
 restart_notify.json
+imagegen_requests.jsonl
 generated/
 uploads/
 __pycache__/
-
+*.pyc

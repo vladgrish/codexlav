@@ -187,6 +187,8 @@ Keep `.env` untracked. `.gitignore` already excludes it.
 
 For every key and where to get it, see [`docs/config-reference.md`](docs/config-reference.md).
 
+Before pushing changes, use [`docs/checkout-practice.md`](docs/checkout-practice.md) to keep `.env`, runtime state, and personal IDs out of git.
+
 ## Validate Local Host
 
 Run [`scripts/check_local_requirements.sh`](scripts/check_local_requirements.sh):

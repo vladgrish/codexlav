@@ -172,6 +172,26 @@ Optional pinned Codex session UUID. Usually leave empty so topics map to their o
 
 Maximum seconds per Codex run.
 
+`CODEX_PROGRESS_SECONDS`
+
+Seconds between long-running Codex heartbeat messages.
+
+`CODEX_GENERATED_IMAGE_ROOT`
+
+Optional location where Codex built-in image generation writes PNG files. Defaults to:
+
+```text
+~/.codex/generated_images
+```
+
+`CODEX_SESSION_ROOT`
+
+Optional location of Codex session JSONL files. Defaults to:
+
+```text
+~/.codex/sessions
+```
+
 ## Skills
 
 `CAVEMAN_SKILL_REPO`
@@ -233,8 +253,22 @@ Usually leave these unset:
 - `TELEGRAM_HANDOFF_DIR`
 - `TELEGRAM_POLL_TIMEOUT_SECONDS`
 - `TELEGRAM_PROGRESS_UPDATE_SECONDS`
+- `TELEGRAM_RESTART_NOTIFY_MAX_AGE_SECONDS`
+- `TELEGRAM_ARTIFACT_MAX_BYTES`
 - `TELEGRAM_BOT_BASE_DIR`
 - `TELEGRAM_IMAGE_DIR`
 - `TELEGRAM_UPLOAD_DIR`
 - `TELEGRAM_STATE_PATH`
+- `TELEGRAM_INLINE_FILE_MAX_BYTES`
 
+`TELEGRAM_RESTART_NOTIFY_MAX_AGE_SECONDS`
+
+Maximum age, in seconds, for restart-ready notifications.
+
+`TELEGRAM_ARTIFACT_MAX_BYTES`
+
+Maximum file size the bot sends directly to Telegram before using GCS artifact delivery.
+
+`TELEGRAM_INLINE_FILE_MAX_BYTES`
+
+Maximum uploaded text-file size to inline into a Codex prompt.
