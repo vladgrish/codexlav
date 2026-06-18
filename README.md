@@ -1,4 +1,4 @@
-# Codexlav
+# <img src="favicon.png" width="32" align="center"> Codexlav
 
 Telegram-first cloud infra for running Codex remotely.
 
